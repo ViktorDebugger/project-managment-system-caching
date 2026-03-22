@@ -1,24 +1,26 @@
 # Сценарій тестування та знімання скріншотів для звіту
 
+**Середовище:** Windows, PowerShell
+
 ## Передумови
 
-- Запущена система: `docker-compose up --build` (або `docker compose up --build`)
+- Запущена система: `docker compose up --build`
 - Усі сервіси в стані `Up`, Redis і БД — `healthy`
-- Swagger доступний за адресою http://localhost:3000/api
+- Swagger доступний за адресою http://localhost:3001/api або http://localhost:3002/api (прямий доступ до сервісів)
 
 ---
 
 ## Етап 1. Перевірка запуску контейнерів
 
-### Команда
+### Команда (PowerShell)
 
-```bash
+```powershell
 docker ps
 ```
 
 або
 
-```bash
+```powershell
 docker compose ps
 ```
 
@@ -36,7 +38,7 @@ docker compose ps
 
 ### Дія
 
-1. Відкрити Swagger: http://localhost:3000/api
+1. Відкрити Swagger: http://localhost:3002/api (workspace) або http://localhost:3001/api (user-auth)
 2. Розгорнути `POST /auth/register`
 3. Виконати запит з тілом:
 
@@ -101,22 +103,33 @@ docker compose ps
 
 ## Етап 4. Перший виклик GET (без кешу)
 
-### Команда (через curl у терміналі)
+### Команда (PowerShell)
 
-```bash
-curl -w "\nЧас відповіді: %{time_total}s\n" -s -o /dev/null -H "Authorization: Bearer ВАШ_TOKEN" http://localhost:3000/workspaces/ВАШ_WORKSPACE_ID
+```powershell
+$token = "ВАШ_TOKEN"
+$wsId = "ВАШ_WORKSPACE_ID"
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+Invoke-RestMethod -Uri "http://localhost:3000/workspaces/$wsId" -Headers @{Authorization="Bearer $token"} -Method GET | Out-Null
+$sw.Stop()
+Write-Host "Час відповіді: $($sw.ElapsedMilliseconds) ms"
 ```
 
 Замінити `ВАШ_TOKEN` та `ВАШ_WORKSPACE_ID` на реальні значення.
 
+**Якщо встановлено curl (Git for Windows):** використовувати `curl.exe`, щоб уникнути аліасу PowerShell:
+
+```powershell
+curl.exe -w "\nЧас відповіді: %{time_total}s\n" -s -o NUL -H "Authorization: Bearer ВАШ_TOKEN" "http://localhost:3000/workspaces/ВАШ_WORKSPACE_ID"
+```
+
 ### Альтернатива — через Swagger
 
 1. Викликати `GET /workspaces/{workspaceId}` з `workspaceId` з попереднього кроку
-2. Зняти скріншот з відповіддю та заголовками/часом виконання (якщо є)
+2. Зняти скріншот з відповіддю
 
 ### Скріншот 3
 
-Знімок терміналу з результатом `curl`, де видно рядок з часом (наприклад, `Час відповіді: 0.052s`).
+Знімок терміналу з результатом команди, де видно рядок з часом (наприклад, `Час відповіді: 52 ms`).
 
 ### Підпис
 
@@ -126,17 +139,20 @@ curl -w "\nЧас відповіді: %{time_total}s\n" -s -o /dev/null -H "Auth
 
 ## Етап 5. Другий виклик GET (з кешу)
 
-### Команда
+### Команда (PowerShell)
 
-Та сама, що в етапі 4, виконати ще раз:
+Та сама, що в етапі 4, виконати ще раз (змінні `$token` та `$wsId` вже задані):
 
-```bash
-curl -w "\nЧас відповіді: %{time_total}s\n" -s -o /dev/null -H "Authorization: Bearer ВАШ_TOKEN" http://localhost:3000/workspaces/ВАШ_WORKSPACE_ID
+```powershell
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+Invoke-RestMethod -Uri "http://localhost:3000/workspaces/$wsId" -Headers @{Authorization="Bearer $token"} -Method GET | Out-Null
+$sw.Stop()
+Write-Host "Час відповіді: $($sw.ElapsedMilliseconds) ms"
 ```
 
 ### Скріншот 4
 
-Знімок терміналу з другим викликом та меншим часом (наприклад, `Час відповіді: 0.008s`).
+Знімок терміналу з другим викликом та меншим часом (наприклад, `Час відповіді: 8 ms`).
 
 ### Підпис
 
@@ -189,16 +205,10 @@ curl -w "\nЧас відповіді: %{time_total}s\n" -s -o /dev/null -H "Auth
 
 ## Етап 8. Перезапуск контейнерів
 
-### Команда
+### Команда (PowerShell)
 
-```bash
+```powershell
 docker compose restart workspace
-```
-
-або
-
-```bash
-docker-compose restart workspace
 ```
 
 ### Дія
@@ -207,7 +217,7 @@ docker-compose restart workspace
 2. Дочекатися, поки сервіс знову стане здоровим
 3. Зняти скріншот стану контейнерів:
 
-```bash
+```powershell
 docker ps
 ```
 
@@ -219,9 +229,9 @@ docker ps
 
 ## Етап 9. Логи workspace (опційно)
 
-### Команда
+### Команда (PowerShell)
 
-```bash
+```powershell
 docker logs project-managment-workspace-1 --tail 30
 ```
 
